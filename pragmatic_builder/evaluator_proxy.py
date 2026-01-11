@@ -1,4 +1,7 @@
 import argparse
+import datetime as dt
+import os
+from pathlib import Path
 import contextlib
 import uvicorn
 import asyncio
@@ -32,8 +35,9 @@ from agentbeats.models import EvalRequest
 logger = logging.getLogger(__name__)
 
 class GreenExecutor(AgentExecutor):
-    def __init__(self, green_agent: BuildingInstructorGreenAgent):
+    def __init__(self, green_agent: BuildingInstructorGreenAgent, debug: bool = False):
         self.agent = green_agent
+        self.debug = debug
 
     async def execute(
         self,
@@ -41,6 +45,18 @@ class GreenExecutor(AgentExecutor):
         event_queue: EventQueue,
     ):
         request_text = context.get_user_input()
+        if self.debug:
+            logger.info("-----")
+            logger.info("Received request context: %s", context)
+            logger.info("User input: %s", request_text)
+            if context.message:
+                parts = getattr(context.message, "parts", []) or []
+                text_parts = []
+                for part in parts:
+                    if hasattr(part, "root") and hasattr(part.root, "text"):
+                        text_parts.append(part.root.text)
+                if text_parts:
+                    logger.info("Raw message text: %s", "\n".join(text_parts))
 
         try:
             req: EvalRequest = EvalRequest.model_validate_json(request_text)
@@ -110,13 +126,21 @@ async def main():
     parser = argparse.ArgumentParser(description="Run the builder evaluator agent")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind the server")
     parser.add_argument("--port", type=int, default=9019, help="Port to bind the server")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
+
+    debug_env = os.getenv("AGENT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    debug = args.debug or debug_env
+    logging.basicConfig(level=logging.INFO if debug else logging.WARNING)
 
     agent_url_cm = contextlib.nullcontext(f"http://{args.host}:{args.port}/")
 
     async with agent_url_cm as agent_url:
-        agent = BuildingInstructorGreenAgent()
-        executor = GreenExecutor(agent)
+        base_dir = os.getenv("AGENT_TRANSCRIPT_DIR", "logs/transcripts")
+        run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
+        transcript_path = Path(base_dir) / run_id / "conversation.log"
+        agent = BuildingInstructorGreenAgent(debug=debug, transcript_path=str(transcript_path))
+        executor = GreenExecutor(agent, debug=debug)
         agent_card = instruction_following_evaluator_card("StructureEvaluator", agent_url)
 
         request_handler = DefaultRequestHandler(
