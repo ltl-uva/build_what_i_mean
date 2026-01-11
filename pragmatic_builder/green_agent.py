@@ -101,8 +101,8 @@ class BuildingInstructorGreenAgent:
         action = string_response[0]
         match action:
             case "[BUILD]":
-                content = set(string_response[1:])
-                target_structure_set = set(target_structure.split(";"))
+                content = self._normalize_structure(string_response[1:])
+                target_structure_set = self._normalize_structure(target_structure.split(";"))
                 if content == target_structure_set:
                     return f"Correct structure built. {target_structure}", True
                 else:
@@ -132,3 +132,19 @@ class BuildingInstructorGreenAgent:
         if "color" in question.lower() and unique_colors:
             return f"Colors in target: {', '.join(unique_colors)}."
         return "I can answer questions about the target structure."
+
+    @staticmethod
+    def _normalize_structure(items) -> set[str]:
+        # Normalize color casing and strip empty/invalid entries for stable comparisons.
+        normalized = set()
+        for item in items:
+            item = item.strip()
+            if not item:
+                continue
+            parts = item.split(",")
+            if len(parts) != 4:
+                continue
+            color = parts[0].strip().capitalize()
+            coords = [p.strip() for p in parts[1:]]
+            normalized.add(",".join([color, *coords]))
+        return normalized
