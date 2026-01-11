@@ -1,6 +1,5 @@
-# A2A Agent Template
-
-A minimal template for building [A2A (Agent-to-Agent)](https://a2a-protocol.org/latest/) green agents compatible with the [AgentBeats](https://agentbeats.dev) platform.
+# Building Game Task - Quick Guide
+Based on the minimal template for building [A2A (Agent-to-Agent)](https://a2a-protocol.org/latest/) green agents compatible with the [AgentBeats](https://agentbeats.dev) platform.
 
 ## Project Structure
 
@@ -17,20 +16,9 @@ pyproject.toml        # Python dependencies
 └─ workflows/
    └─ test-and-publish.yml # CI workflow
 ```
+## How to Play
 
-## Getting Started
-
-1. **Create your repository** - Click "Use this template" to create your own repository from this template
-
-2. **Implement your agent** - Add your agent logic to [`pragmatic_builder/green_agent.py`](pragmatic_builder/green_agent.py)
-
-3. **Configure your agent card** - Fill in your agent's metadata (name, skills, description) in [`pragmatic_builder/builder_agent.py`](pragmatic_builder/builder_agent.py)
-
-4. **Write your tests** - Add custom tests for your agent in a new `tests/` module
-
-For a concrete example of implementing a green agent using this template, see this [draft PR](https://github.com/RDI-Foundation/green-agent-template/pull/3).
-
-## Running Locally
+### Running Locally
 
 ```bash
 # Install dependencies
@@ -43,13 +31,13 @@ uv run pragmatic_builder/builder_agent.py --host 127.0.0.1 --port 9019
 uv run pragmatic_builder/evaluator_proxy.py --host 127.0.0.1 --port 9009
 ```
 
-# Running the default Scenario
+### Running the default Scenario
 ```bash
 cd pragmatic_builder
 AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario.toml --show-logs
 ```
 
-# Running a Scenario with a questionnaire
+### Running a Scenario with a questionnaire
 ```bash
 cd pragmatic_builder
 AGENT_QA_MODE=dummy AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_question_dummy.toml --show-logs
@@ -61,7 +49,7 @@ export OPENAI_API_KEY="your_openai_api_key_here"
 AGENT_QA_MODE=openai AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_question_dummy.toml --show-logs
 ```
 
-## Running with Docker
+## Running with Docker (not tested yet)
 
 ```bash
 # Build the image
