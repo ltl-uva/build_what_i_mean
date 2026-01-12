@@ -38,25 +38,16 @@ class BuildingGameTask:
         """Randomly choose 'a' or 'b' for Lisa, with 'b' appearing 2/3 of the time."""
         return random.choices(['a', 'b'], weights=[1, 2], k=1)[0]
 
-    def run(self, payload: Any) -> Dict[str, Any]:
-        """Generate 20 building instructions with all rounds from one speaker first, then the other."""
-        if payload is None:
-            payload = {}
+    def _categorize_trials(self, data: List[Dict[str, str]]) -> Dict[str, List[str]]:
+        """Categorize trials by type (fully_spec, color_under, number_under)."""
+        categories = {
+            'fully_spec': [],
+            'color_under': [],
+            'number_under': []
+        }
 
-        if not isinstance(payload, dict):
-            raise ValueError("Building game input must be a dictionary or None")
+        seen_base_numbers = set()
 
-        # Step 1: Randomly choose starting speaker
-        speakers = ['Pia', 'Lisa']
-        first_speaker = random.choice(speakers)
-        second_speaker = 'Lisa' if first_speaker == 'Pia' else 'Pia'
-
-        # Step 2: Randomly choose list
-        chosen_list = random.choice([1, 2])
-        data = self.list1_data if chosen_list == 1 else self.list2_data
-
-        # Get available trial numbers
-        trial_numbers = []
         for row in data:
             trial_num = row['trialNumber']
             # Extract base number (remove 'a' or 'b' suffix)
@@ -64,79 +55,190 @@ class BuildingGameTask:
                 base_num = trial_num[:-1]
             else:
                 base_num = trial_num
-            if base_num not in trial_numbers:
-                trial_numbers.append(base_num)
 
-        # Shuffle and take 20 trials
-        random.shuffle(trial_numbers)
-        selected_trials = trial_numbers[:20]
+            # Only process each base number once
+            if base_num in seen_base_numbers:
+                continue
+            seen_base_numbers.add(base_num)
 
-        # Step 3: Generate instructions for first speaker (10 rounds)
+            # Categorize based on trial type in the row
+            trial_type = row.get('trialType', '')
+            if trial_type == 'fully_spec':
+                categories['fully_spec'].append(base_num)
+            elif trial_type == 'color_under':
+                categories['color_under'].append(base_num)
+            elif trial_type == 'number_under':
+                categories['number_under'].append(base_num)
+
+        return categories
+
+    def run(self, payload: Any) -> Dict[str, Any]:
+        """Generate building instructions with new trial selection logic."""
+        if payload is None:
+            payload = {}
+
+        if not isinstance(payload, dict):
+            raise ValueError("Building game input must be a dictionary or None")
+
+        # Step 1: Randomly choose speaker order
+        speakers = ['Pia', 'Lisa']
+        first_speaker = random.choice(speakers)
+        second_speaker = 'Lisa' if first_speaker == 'Pia' else 'Pia'
+
+        # Step 2: Randomly choose list for fully_spec trials
+        fully_spec_list = random.choice([1, 2])
+        fully_spec_data = self.list1_data if fully_spec_list == 1 else self.list2_data
+
+        # Step 3: Randomly choose list for color_under and number_under trials
+        underspec_list = random.choice([1, 2])
+        underspec_data = self.list1_data if underspec_list == 1 else self.list2_data
+
+        # Categorize trials from both lists
+        fully_spec_categories = self._categorize_trials(fully_spec_data)
+        underspec_categories = self._categorize_trials(underspec_data)
+
+        # Get trials for first speaker
+        first_speaker_trials = {
+            'fully_spec': fully_spec_categories['fully_spec'][:],
+            'color_under': underspec_categories['color_under'][:],
+            'number_under': underspec_categories['number_under'][:]
+        }
+
+        # Get trials for second speaker (the rest from list1 and list2)
+        # Categorize all trials from both lists
+        all_list1_categories = self._categorize_trials(self.list1_data)
+        all_list2_categories = self._categorize_trials(self.list2_data)
+
+        # Second speaker gets remaining trials
+        second_speaker_trials = {
+            'fully_spec': [],
+            'color_under': [],
+            'number_under': []
+        }
+
+        # Add fully_spec from the other list
+        other_fully_spec_list = 2 if fully_spec_list == 1 else 1
+        other_fully_spec_data = self.list2_data if other_fully_spec_list == 2 else self.list1_data
+        other_fully_spec_categories = self._categorize_trials(other_fully_spec_data)
+        second_speaker_trials['fully_spec'] = other_fully_spec_categories['fully_spec'][:]
+
+        # Add color_under and number_under from the other list
+        other_underspec_list = 2 if underspec_list == 1 else 1
+        other_underspec_data = self.list2_data if other_underspec_list == 2 else self.list1_data
+        other_underspec_categories = self._categorize_trials(other_underspec_data)
+        second_speaker_trials['color_under'] = other_underspec_categories['color_under'][:]
+        second_speaker_trials['number_under'] = other_underspec_categories['number_under'][:]
+
+        # Helper function to create instruction
+        def create_instruction(trial_base: str, speaker: str, trial_type: str, list_id: int) -> Dict[str, Any] | None:
+            data = self.list1_data if list_id == 1 else self.list2_data
+
+            # Determine version
+            if speaker == 'Pia':
+                version = 'a'
+            else:  # Lisa
+                if trial_type == 'fully_spec':
+                    version = ''  # fully_spec trials don't have versions
+                else:  # color_under or number_under
+                    # Use 'b' version 4/6 of the time
+                    version = random.choices(['a', 'b'], weights=[2, 4], k=1)[0]
+
+            # Get trial data
+            if version:
+                trial_with_version = f"{trial_base}{version}"
+                trial_data = self._get_instruction_data(trial_with_version, data)
+            else:
+                trial_data = self._get_instruction_data(trial_base, data)
+
+            # If versioned trial doesn't exist, try base number
+            if trial_data is None:
+                trial_data = self._get_instruction_data(trial_base, data)
+
+            if trial_data is None:
+                return None
+
+            return {
+                "speaker": speaker,
+                "start_structure": trial_data['startStructure'],
+                "instruction": trial_data['sentenceW'],
+                "trial_id": trial_data["trialNumber"],
+                "list_id": list_id,
+                "target_structure": trial_data["targetStructure"],
+                "trial_type": trial_type
+            }
+
+        # Generate instructions for first speaker
         instructions_A = []
-        for i, trial_base in enumerate(selected_trials[:10]):
-            speaker = first_speaker
 
-            # Determine version based on speaker
-            if speaker == 'Pia':
-                version = 'a'  # Pia always uses 'a'
-            else:  # Lisa
-                version = self._generate_lisa_version_choice()
+        # Add fully_spec trials
+        for trial_base in first_speaker_trials['fully_spec']:
+            instr = create_instruction(trial_base, first_speaker, 'fully_spec', fully_spec_list)
+            if instr:
+                instructions_A.append(instr)
 
-            # Get the trial number with version suffix
-            trial_with_version = f"{trial_base}{version}"
-            trial_data = self._get_instruction_data(trial_with_version, data)
+        # Add color_under trials
+        for trial_base in first_speaker_trials['color_under']:
+            instr = create_instruction(trial_base, first_speaker, 'color_under', underspec_list)
+            if instr:
+                instructions_A.append(instr)
 
-            # If versioned trial doesn't exist (e.g., fully_spec trials), use base number
-            if trial_data is None:
-                trial_data = self._get_instruction_data(trial_base, data)
+        # Add number_under trials
+        for trial_base in first_speaker_trials['number_under']:
+            instr = create_instruction(trial_base, first_speaker, 'number_under', underspec_list)
+            if instr:
+                instructions_A.append(instr)
 
-            if trial_data is None:
-                continue
-
-            instruction = {
-                "round": i + 1,
-                "speaker": speaker,
-                "start_structure": trial_data['startStructure'],
-                "instruction": trial_data['sentenceW'],
-                "trial_id": trial_data["trialNumber"],
-                "list_id": chosen_list,
-                "target_structure": trial_data["targetStructure"],
-            }
-            instructions_A.append(instruction)
-
-        # Step 4: Generate instructions for second speaker (10 rounds)
+        # Generate instructions for second speaker
         instructions_B = []
-        for i, trial_base in enumerate(selected_trials[10:20]):
-            speaker = second_speaker
 
-            # Determine version based on speaker
-            if speaker == 'Pia':
-                version = 'a'  # Pia always uses 'a'
-            else:  # Lisa
-                version = self._generate_lisa_version_choice()
+        # Add fully_spec trials
+        for trial_base in second_speaker_trials['fully_spec']:
+            instr = create_instruction(trial_base, second_speaker, 'fully_spec', other_fully_spec_list)
+            if instr:
+                instructions_B.append(instr)
 
-            # Get the trial number with version suffix
-            trial_with_version = f"{trial_base}{version}"
-            trial_data = self._get_instruction_data(trial_with_version, data)
+        # Add color_under trials
+        for trial_base in second_speaker_trials['color_under']:
+            instr = create_instruction(trial_base, second_speaker, 'color_under', other_underspec_list)
+            if instr:
+                instructions_B.append(instr)
 
-            # If versioned trial doesn't exist (e.g., fully_spec trials), use base number
-            if trial_data is None:
-                trial_data = self._get_instruction_data(trial_base, data)
+        # Add number_under trials
+        for trial_base in second_speaker_trials['number_under']:
+            instr = create_instruction(trial_base, second_speaker, 'number_under', other_underspec_list)
+            if instr:
+                instructions_B.append(instr)
 
-            if trial_data is None:
-                continue
+        # Separate fully_spec trials from others for both lists
+        fully_spec_A = [instr for instr in instructions_A if instr['trial_type'] == 'fully_spec']
+        others_A = [instr for instr in instructions_A if instr['trial_type'] != 'fully_spec']
 
-            # Build instruction object (only info purple agent should see)
-            instruction = {
-                "round": i + 11,  # Continue counting from 11
-                "speaker": speaker,
-                "start_structure": trial_data['startStructure'],
-                "instruction": trial_data['sentenceW'],
-                "trial_id": trial_data["trialNumber"],
-                "target_structure": trial_data["targetStructure"],
-                "list_id": chosen_list
-            }
-            instructions_B.append(instruction)
+        fully_spec_B = [instr for instr in instructions_B if instr['trial_type'] == 'fully_spec']
+        others_B = [instr for instr in instructions_B if instr['trial_type'] != 'fully_spec']
+
+        # Randomize the non-fully_spec trials
+        random.shuffle(others_A)
+        random.shuffle(others_B)
+
+        # Ensure first trial is fully_spec, then add randomized others
+        if fully_spec_A:
+            instructions_A = [fully_spec_A[0]] + fully_spec_A[1:] + others_A
+            random.shuffle(instructions_A[1:])  # Shuffle everything except the first trial
+        else:
+            instructions_A = others_A
+
+        if fully_spec_B:
+            instructions_B = [fully_spec_B[0]] + fully_spec_B[1:] + others_B
+            random.shuffle(instructions_B[1:])  # Shuffle everything except the first trial
+        else:
+            instructions_B = others_B
+
+        # Add round numbers
+        for i, instr in enumerate(instructions_A):
+            instr['round'] = i + 1
+
+        for i, instr in enumerate(instructions_B):
+            instr['round'] = i + len(instructions_A) + 1
 
         grid_context = (
             "Grid: 9x9 cells. Origin=\"middle square\": center (0,0), is highlighted. "
@@ -154,7 +256,7 @@ class BuildingGameTask:
         return {
             "type": "building_game",
             "grid_context": grid_context,
-            "chosen_list": chosen_list,
+            "chosen_list": "mixed",
             "first_speaker": first_speaker,
             "second_speaker": second_speaker,
             "instructions_A": instructions_A,
