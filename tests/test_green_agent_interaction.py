@@ -156,3 +156,23 @@ async def test_green_agent_with_question_dummy(monkeypatch):
 
     server.stop()
     server.join(timeout=2)
+
+
+@pytest.mark.asyncio
+async def test_eval_message_matching_normalizes_case_and_empty():
+    agent = BuildingInstructorGreenAgent()
+    target = "Purple,0,50,0;Red,0,50,100"
+    response = "[BUILD];PURPLE,0,50,0;RED,0,50,100;"
+    msg, correct = await agent.eval_message(response, target)
+    assert correct is True
+    assert msg.startswith("Correct structure built.")
+
+
+@pytest.mark.asyncio
+async def test_eval_message_matching_detects_mismatch():
+    agent = BuildingInstructorGreenAgent()
+    target = "Purple,0,50,0;Red,0,50,100"
+    response = "[BUILD];Purple,0,50,0;Red,100,50,100"
+    msg, correct = await agent.eval_message(response, target)
+    assert correct is False
+    assert msg.startswith("Incorrect structure.")

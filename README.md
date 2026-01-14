@@ -41,12 +41,21 @@ AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.
 ```bash
 cd pragmatic_builder
 AGENT_QA_MODE=dummy AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_question_dummy.toml --show-logs
+```
 
-# Running a Scenario with OpenAI QA
+### Running a Scenario with OpenAI QA
 ```bash
 cd pragmatic_builder
 export OPENAI_API_KEY="your_openai_api_key_here"
 AGENT_QA_MODE=openai AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_question_dummy.toml --show-logs
+```
+
+### Running a Scenario with an OpenAI Purple Agent
+```bash
+cd pragmatic_builder
+export OPENAI_API_KEY="your_openai_api_key_here"
+export OPENAI_MODEL="gpt-4o-mini"
+AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_openai_purple.toml --show-logs
 ```
 
 ## Running with Docker (not tested yet)
