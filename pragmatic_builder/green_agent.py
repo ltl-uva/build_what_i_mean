@@ -143,13 +143,13 @@ class BuildingInstructorGreenAgent:
                             }
             case "[ASK]":
                 content = ";".join(string_response[1:]).strip()
-                if self._qa:
-                    answer = await self._qa.answer(
-                        question=content,
-                        target_structure=target_structure,
-                    )
-                else:
-                    answer = self._fallback_answer(content, target_structure)
+                # if self._qa:
+                #     answer = await self._qa.answer(
+                #         question=content,
+                #         target_structure=target_structure,
+                #     )
+                # else:
+                answer = self._fallback_answer(content, target_structure)
                 return {"message": f"Answer: {answer}",
                         "num_correct":None,
                         "num_questions": 1,
