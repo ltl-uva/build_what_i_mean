@@ -1,6 +1,7 @@
 import argparse
 import datetime as dt
 import os
+import socket
 from pathlib import Path
 import uvicorn
 import asyncio
@@ -133,20 +134,24 @@ async def main():
     debug = args.debug or debug_env
     logging.basicConfig(level=logging.INFO if debug else logging.WARNING)
 
-    agent_url = f"http://{args.host}:{args.port}/"
+    card_url = args.card_url
+    if not card_url:
+        hostname = socket.gethostname()
+        card_url = f"http://{hostname}:{args.port}"
 
     base_dir = os.getenv("AGENT_TRANSCRIPT_DIR", "logs/transcripts")
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
     transcript_path = Path(base_dir) / run_id / "conversation.log"
     agent = BuildingInstructorGreenAgent(debug=debug, transcript_path=str(transcript_path))
     executor = GreenExecutor(agent, debug=debug)
-    agent_card = instruction_following_evaluator_card("StructureEvaluator", agent_url)
+    agent_card = instruction_following_evaluator_card("StructureEvaluator", card_url)
 
     request_handler = DefaultRequestHandler(
         agent_executor=executor,
         task_store=InMemoryTaskStore(),
     )
 
+    logger.info(f"Starting evaluator agent on {args.host}:{args.port} with card URL: {card_url}")
     server = A2AStarletteApplication(
         agent_card=agent_card,
         http_handler=request_handler,
