@@ -69,31 +69,46 @@ class BuildingInstructorGreenAgent:
         results = {}
         num_correct = 0
         scored_count = 0
+        questions_count = 0
         # TODO: initial turn with the grid context
         task_description = f"[TASK_DESCRIPTION] {trials['grid_context']})"
         for speaker in [trials["instructions_A"], trials["instructions_B"]]:
+            prompt_chain = []
+            response_chain = []
             for instruction in speaker:
-                prompt = f"{task_description}\n{instruction['instruction']}"
-                instruction_response = await turn("Rita", prompt)
-                eval_message_result, correct = await self.eval_message(
-                    instruction_response,
-                    instruction["target_structure"],
-                )
-                await send_feedback("Rita", f"Feedback: {eval_message_result}")
-                if correct is not None:
+                round_questions_count = 0
+                prompt = f"{task_description}\n[START_STRUCTURE] {instruction['start_structure']}\n{instruction['instruction']}"
+                prompt_chain.append(prompt)
+                built = False
+                eval_result = {}
+                while built is not True:
+                    instruction_response = await turn("Rita", prompt)
+                    response_chain.append(instruction_response)
+                    eval_result = await self.eval_message(
+                        instruction_response,
+                        instruction["target_structure"],
+                    )
+                    round_questions_count += eval_result["num_questions"]
+                    prompt = eval_result['message']
+                    built = eval_result['built']
+                await send_feedback("Rita", f"Feedback: {eval_result['message']}")
+                if eval_result["num_correct"] is not None:
                     scored_count += 1
-                    if correct:
-                        num_correct += 1
-                results[instruction["round"]] = {"instruction": instruction["instruction"],
-                                                   "instruction_response": instruction_response,
-                                                   "eval_feedback_message": eval_message_result,
-                                                   "correct": None if correct is None else int(correct),
+                    num_correct += eval_result["num_correct"]
+                questions_count += round_questions_count
+                results[instruction["round"]] = {"prompts": prompt_chain,
+                                                   "responses": response_chain,
+                                                   "eval_feedback_message": eval_result["message"],
+                                                   "num_correct": eval_result["num_correct"],
+                                                    "num_questions": round_questions_count,
                                                    "response_feedback": None}
 
+
         accuracy = (num_correct / scored_count * 100.0) if scored_count else 0.0
+        questions_count = questions_count/len(trials["instructions_A"] + trials["instructions_B"])
         # TODO: metric here to compare response to expected answer
         try:
-            result = EvalResult(status="ok", feedback={"message": accuracy})
+            result = EvalResult(status="ok", feedback={"accuracy": accuracy, "avg_questions_per_instruction": questions_count})
             await updater.add_artifact(
                 parts=[
                     Part(root=TextPart(text=result.model_dump_json())),
@@ -115,9 +130,17 @@ class BuildingInstructorGreenAgent:
                 content = self._normalize_structure(string_response[1:])
                 target_structure_set = self._normalize_structure(target_structure.split(";"))
                 if content == target_structure_set:
-                    return f"Correct structure built. {target_structure}", True
+                    return {"message": f"Correct structure built. {target_structure}",
+                            "num_correct": 1,
+                            "num_questions":0,
+                            "built": True
+                            }
                 else:
-                    return f"Incorrect structure. Expected: {target_structure}, but got: {';'.join(content)}", False
+                    return {"message":"Incorrect structure. Expected: {target_structure}, but got: {';'.join(content)}",
+                            "num_correct": 0,
+                            "num_questions":0,
+                            "built":True
+                            }
             case "[ASK]":
                 content = ";".join(string_response[1:]).strip()
                 if self._qa:
@@ -127,11 +150,12 @@ class BuildingInstructorGreenAgent:
                     )
                 else:
                     answer = self._fallback_answer(content, target_structure)
-                return f"Answer: {answer}", None
+                return {"message": f"Answer: {answer}",
+                        "num_correct":None,
+                        "num_questions": 1,
+                        "built": False}
             case _:
                 raise ServerError(error=InvalidParamsError(message="Invalid action in response"))
-
-        return None, None
 
     @staticmethod
     def _fallback_answer(question: str, target_structure: str) -> str:
