@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+from pathlib import Path
 from a2a.server.tasks import TaskUpdater
 from a2a.types import (
     InvalidParamsError,
@@ -39,7 +40,9 @@ class BuildingInstructorGreenAgent:
     async def run_eval(self, req: EvalRequest, updater: TaskUpdater) -> None:
         logger.info(f"Starting structure evaluation: {req}")
 
-        bulding_task = BuildingGameTask(req.config["list1_path"], req.config["list2_path"])
+        list1_path = self._resolve_path(req.config["list1_path"])
+        list2_path = self._resolve_path(req.config["list2_path"])
+        bulding_task = BuildingGameTask(list1_path, list2_path)
 
         trials = bulding_task.run(None)
         logger.info(f"created trials {trials}")
@@ -185,3 +188,12 @@ class BuildingInstructorGreenAgent:
             coords = [p.strip() for p in parts[1:]]
             normalized.add(",".join([color, *coords]))
         return normalized
+
+    @staticmethod
+    def _resolve_path(path_str: str) -> str:
+        path = Path(path_str)
+        if path.is_absolute() or path.exists():
+            return str(path)
+        repo_root = Path(__file__).resolve().parent.parent
+        candidate = repo_root / path
+        return str(candidate)

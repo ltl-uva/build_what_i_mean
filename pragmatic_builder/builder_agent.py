@@ -9,7 +9,6 @@ import uvicorn
 import argparse
 import os
 import logging
-import socket
 logger = logging.getLogger(__name__)
 
 def prepare_agent_card(url: str) -> AgentCard:
@@ -84,8 +83,11 @@ def main():
     
     card_url = args.card_url
     if not card_url:
-        hostname = socket.gethostname()
-        card_url = f"http://{hostname}:{args.port}"
+        if args.host == "0.0.0.0":
+            card_host = "127.0.0.1"
+        else:
+            card_host = args.host
+        card_url = f"http://{card_host}:{args.port}"
     
     logger.info(f"Starting builder agent on {args.host}:{args.port} with card URL: {card_url}")
     card = prepare_agent_card(card_url)

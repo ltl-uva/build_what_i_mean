@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-import socket
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.events import EventQueue
@@ -99,8 +98,11 @@ def main() -> None:
 
     card_url = args.card_url
     if not card_url:
-        hostname = socket.gethostname()
-        card_url = f"http://{hostname}:{args.port}"
+        if args.host == "0.0.0.0":
+            card_host = "127.0.0.1"
+        else:
+            card_host = args.host
+        card_url = f"http://{card_host}:{args.port}"
 
     card = prepare_agent_card(card_url)
     request_handler = DefaultRequestHandler(

@@ -1,7 +1,6 @@
 import argparse
 import datetime as dt
 import os
-import socket
 from pathlib import Path
 import uvicorn
 import asyncio
@@ -135,8 +134,11 @@ async def main():
 
     card_url = args.card_url
     if not card_url:
-        hostname = socket.gethostname()
-        card_url = f"http://{hostname}:{args.port}"
+        if args.host == "0.0.0.0":
+            card_host = "127.0.0.1"
+        else:
+            card_host = args.host
+        card_url = f"http://{card_host}:{args.port}"
 
     base_dir = os.getenv("AGENT_TRANSCRIPT_DIR", "logs/transcripts")
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
