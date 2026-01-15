@@ -109,7 +109,7 @@ class BuildingInstructorGreenAgent:
         questions_count = questions_count/len(trials["instructions_A"] + trials["instructions_B"])
         # TODO: metric here to compare response to expected answer
         try:
-            result = EvalResult(status="ok", feedback={"accuracy": accuracy, "avg_questions_per_instruction": questions_count})
+            result = EvalResult(details={"accuracy":accuracy, "avg_questions_per_instruction":questions_count})
             await updater.add_artifact(
                 parts=[
                     Part(root=TextPart(text=result.model_dump_json())),
