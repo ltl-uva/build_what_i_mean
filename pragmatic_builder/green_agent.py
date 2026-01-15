@@ -141,7 +141,7 @@ class BuildingInstructorGreenAgent:
                             "built": True
                             }
                 else:
-                    return {"message":"Incorrect structure. Expected: {target_structure}, but got: {';'.join(content)}",
+                    return {"message": f"Incorrect structure. Expected: {target_structure}, but got: {';'.join(content)}",
                             "num_correct": 0,
                             "num_questions":0,
                             "built":True
