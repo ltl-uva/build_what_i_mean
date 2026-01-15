@@ -3,7 +3,7 @@ endpoint = "http://127.0.0.1:9009"
 cmd = "python evaluator_proxy.py --host 127.0.0.1 --port 9009"
 
 [[participants]]
-role = "Rita"
+role = "rita"
 endpoint = "http://127.0.0.1:9020"
 cmd = "python question_dummy_agent.py --host 127.0.0.1 --port 9020"
 

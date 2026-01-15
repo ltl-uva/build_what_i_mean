@@ -112,7 +112,7 @@ async def test_green_agent_with_builder_agent(monkeypatch):
 
     agent = BuildingInstructorGreenAgent()
     req = EvalRequest(
-        participants={"Rita": f"http://{host}:{port}/"},
+        participants={"rita": f"http://{host}:{port}/"},
         config={
             "list1_path": "data/List1_FINAL_stimuli_list.csv",
             "list2_path": "data/List2_FINAL_stimuli_list.csv",
@@ -145,7 +145,7 @@ async def test_green_agent_with_question_dummy(monkeypatch):
 
     agent = BuildingInstructorGreenAgent()
     req = EvalRequest(
-        participants={"Rita": f"http://{host}:{port}/"},
+        participants={"rita": f"http://{host}:{port}/"},
         config={
             "list1_path": "data/List1_FINAL_stimuli_list.csv",
             "list2_path": "data/List2_FINAL_stimuli_list.csv",
