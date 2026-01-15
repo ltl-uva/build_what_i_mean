@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class BuildingInstructorGreenAgent:
     def __init__(self, debug: bool = False, transcript_path: str | None = None):
-        self._required_roles = ["Rita"]
+        self._required_roles = ["rita"]
         self._required_config_keys = ["list1_path", "list2_path"]
         self._tool_provider = ToolProvider()
         self._debug = debug
@@ -72,7 +72,7 @@ class BuildingInstructorGreenAgent:
         questions_count = 0
         # TODO: initial turn with the grid context
         task_description = f"[TASK_DESCRIPTION] {trials['grid_context']})"
-        purple_agent_role = req.participants["role"]
+        purple_agent_role = 'rita'
         for speaker in [trials["instructions_A"], trials["instructions_B"]]:
             prompt_chain = []
             response_chain = []
