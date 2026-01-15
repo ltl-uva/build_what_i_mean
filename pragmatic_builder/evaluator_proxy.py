@@ -103,10 +103,9 @@ def instruction_following_evaluator_card(agent_name: str, card_url: str) -> Agen
         examples=["""
             {
               "participants": {
-                "builder": "https://builder.example.com:443"
+                "pragmatic_builder_purple": "https://builder.example.com:443"
               },
-              "config":{
-              "domain":"blocks"}"""
+              "config":{}"""
             ]
 
     )

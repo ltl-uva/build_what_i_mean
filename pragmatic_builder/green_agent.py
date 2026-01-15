@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class BuildingInstructorGreenAgent:
     def __init__(self, debug: bool = False, transcript_path: str | None = None):
-        self._required_roles = ["rita"]
+        self._required_roles = ["Rita"]
         self._required_config_keys = ["list1_path", "list2_path"]
         self._tool_provider = ToolProvider()
         self._debug = debug
@@ -72,6 +72,7 @@ class BuildingInstructorGreenAgent:
         questions_count = 0
         # TODO: initial turn with the grid context
         task_description = f"[TASK_DESCRIPTION] {trials['grid_context']})"
+        purple_agent_role = req.participants["role"]
         for speaker in [trials["instructions_A"], trials["instructions_B"]]:
             prompt_chain = []
             response_chain = []
@@ -82,7 +83,7 @@ class BuildingInstructorGreenAgent:
                 built = False
                 eval_result = {}
                 while built is not True:
-                    instruction_response = await turn("rita", prompt)
+                    instruction_response = await turn(purple_agent_role, prompt)
                     response_chain.append(instruction_response)
                     eval_result = await self.eval_message(
                         instruction_response,
@@ -91,7 +92,7 @@ class BuildingInstructorGreenAgent:
                     round_questions_count += eval_result["num_questions"]
                     prompt = eval_result['message']
                     built = eval_result['built']
-                await send_feedback("rita", f"Feedback: {eval_result['message']}")
+                await send_feedback(purple_agent_role, f"Feedback: {eval_result['message']}")
                 if eval_result["num_correct"] is not None:
                     scored_count += 1
                     num_correct += eval_result["num_correct"]
