@@ -35,6 +35,7 @@ class BuildingInstructorGreenAgent:
     async def _debug_pause(self, prompt: str) -> None:
         if not self._debug or not sys.stdin.isatty():
             return
+            return
         await asyncio.to_thread(input, prompt)
 
     async def run_eval(self, req: EvalRequest, updater: TaskUpdater) -> None:
@@ -98,7 +99,9 @@ class BuildingInstructorGreenAgent:
                 response_chain = []
                 for instruction in speaker:
                     round_questions_count = 0
-                    prompt = f"{task_description}\n[START_STRUCTURE] {instruction['start_structure']}\n{instruction['instruction']}"
+                    # MODIFIED: Include speaker name in the prompt
+                    speaker_name = instruction['speaker']
+                    prompt = f"{task_description}\n[SPEAKER] {speaker_name}\n[START_STRUCTURE] {instruction['start_structure']}\n{instruction['instruction']}"
                     prompt_chain.append(prompt)
                     built = False
                     eval_result = {}
@@ -123,7 +126,9 @@ class BuildingInstructorGreenAgent:
                         "eval_feedback_message": eval_result["message"],
                         "num_correct": eval_result["num_correct"],
                         "num_questions": round_questions_count,
-                        "response_feedback": None
+                        "response_feedback": None,
+                        # MODIFIED: Store speaker information in results
+                        "speaker": speaker_name
                     }
 
             # Calculate metrics for this seed
