@@ -91,6 +91,7 @@ class BuildingInstructorGreenAgent:
             num_correct = 0
             scored_count = 0
             questions_count = 0
+            total_score = 0  # Track cumulative score
 
             task_description = f"[TASK_DESCRIPTION] {trials['grid_context']})"
 
@@ -99,6 +100,7 @@ class BuildingInstructorGreenAgent:
                 response_chain = []
                 for instruction in speaker:
                     round_questions_count = 0
+                    round_score = 0  # Track score for this round
                     # MODIFIED: Include speaker name in the prompt
                     speaker_name = instruction['speaker']
                     prompt = f"{task_description}\n[SPEAKER] {speaker_name}\n[START_STRUCTURE] {instruction['start_structure']}\n{instruction['instruction']}"
@@ -113,9 +115,16 @@ class BuildingInstructorGreenAgent:
                             instruction["target_structure"],
                         )
                         round_questions_count += eval_result["num_questions"]
+                        round_score += eval_result.get("points", 0)  # Accumulate points
                         prompt = eval_result['message']
                         built = eval_result['built']
-                    await send_feedback(purple_agent_role, f"Feedback: {eval_result['message']}")
+
+                    total_score += round_score  # Add round score to total
+
+                    # Include score in feedback
+                    feedback_msg = f"Feedback: {eval_result['message']} | Round score: {round_score:+d} | Total score: {total_score:+d}"
+                    await send_feedback(purple_agent_role, feedback_msg)
+
                     if eval_result["num_correct"] is not None:
                         scored_count += 1
                         num_correct += eval_result["num_correct"]
@@ -128,7 +137,8 @@ class BuildingInstructorGreenAgent:
                         "num_questions": round_questions_count,
                         "response_feedback": None,
                         # MODIFIED: Store speaker information in results
-                        "speaker": speaker_name
+                        "speaker": speaker_name,
+                        "round_score": round_score  # Store round score
                     }
 
             # Calculate metrics for this seed
@@ -140,16 +150,23 @@ class BuildingInstructorGreenAgent:
             all_results[f"seed_{seed}"] = {
                 "accuracy": accuracy,
                 "avg_questions_per_instruction": avg_questions,
+                "total_score": total_score,  # Add total score for this seed
                 "results": results
             }
 
-            logger.info(f"Seed {seed} - Accuracy: {accuracy:.2f}%, Avg Questions: {avg_questions:.2f}")
+            logger.info(
+                f"Seed {seed} - Accuracy: {accuracy:.2f}%, Avg Questions: {avg_questions:.2f}, Total Score: {total_score}")
 
         # Calculate overall averages
         overall_accuracy = sum(all_accuracies) / len(all_accuracies) if all_accuracies else 0.0
         overall_avg_questions = sum(all_avg_questions) / len(all_avg_questions) if all_avg_questions else 0.0
 
-        logger.info(f"Overall - Accuracy: {overall_accuracy:.2f}%, Avg Questions: {overall_avg_questions:.2f}")
+        # Calculate average score across all seeds
+        all_scores = [all_results[f"seed_{seed}"]["total_score"] for seed in range(num_seeds)]
+        overall_avg_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
+
+        logger.info(
+            f"Overall - Accuracy: {overall_accuracy:.2f}%, Avg Questions: {overall_avg_questions:.2f}, Avg Score: {overall_avg_score:.2f}")
 
         try:
             result = EvalResult(
@@ -168,6 +185,7 @@ class BuildingInstructorGreenAgent:
             detailed_results = {
                 "overall_accuracy": overall_accuracy,
                 "overall_avg_questions": overall_avg_questions,
+                "overall_avg_score": overall_avg_score,  # Add average score
                 "individual_seeds": all_results
             }
             await updater.add_artifact(
@@ -191,16 +209,20 @@ class BuildingInstructorGreenAgent:
                 content = self._normalize_structure(string_response[1:])
                 target_structure_set = self._normalize_structure(target_structure.split(";"))
                 if content == target_structure_set:
-                    return {"message": f"Correct structure built. {target_structure}",
+                    points = 10
+                    return {"message": f"Correct structure built! +{points} points. {target_structure}",
                             "num_correct": 1,
                             "num_questions": 0,
-                            "built": True
+                            "built": True,
+                            "points": points
                             }
                 else:
-                    return {"message": f"Incorrect structure. Expected: {target_structure}, but got: {';'.join(content)}",
+                    points = -10
+                    return {"message": f"Incorrect structure. {points} points. Expected: {target_structure}, but got: {';'.join(content)}",
                             "num_correct": 0,
                             "num_questions": 0,
-                            "built": True
+                            "built": True,
+                            "points": points
                             }
 
             case "[ASK]":
@@ -212,10 +234,12 @@ class BuildingInstructorGreenAgent:
                     )
                 else:
                     answer = self._fallback_answer(content, target_structure)
-                return {"message": f"Answer: {answer}",
+                points = -5
+                return {"message": f"Answer: {answer} ({points} points for asking)",
                         "num_correct": None,
                         "num_questions": 1,
-                        "built": False}
+                        "built": False,
+                        "points": points}
 
 
             case _:

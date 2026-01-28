@@ -252,7 +252,9 @@ class BuildingGameTask:
             "not contain an existing structure. The grid might be empty. Output: "
             "\"Coordinates:Color,x,y,z;Color,x,y,z;\" items separated by \";\"; no spaces; "
             "write coordinates of all blocks that are on the grid, including the initial "
-            "coordinates; color should be capitalized. Only one question is allowed."
+            "coordinates; color should be capitalized. Only one question is allowed. "
+            "Scoring: Building the correct structure earns +10 points. Asking a question "
+            "costs -5 points. Building an incorrect structure costs -10 points."
         )
 
         return {
