@@ -58,6 +58,18 @@ export OPENAI_MODEL="gpt-4o-mini"
 AGENT_TRANSCRIPT_DIR=logs/transcripts AGENT_DEBUG=1 uv run python -m agentbeats.run_scenario scenario_openai_purple.toml --show-logs
 ```
 
+### Run Scenario Agents + CLI Client (writes results.json)
+```bash
+cd pragmatic_builder
+AGENT_TRANSCRIPT_DIR=logs/transcripts \
+  uv run python -m agentbeats.run_scenario scenario.toml --serve-only &
+```
+
+```bash
+cd pragmatic_builder
+uv run python -m agentbeats.client_cli scenario.toml results.json
+```
+
 ## Running with Docker (not tested yet)
 
 ```bash

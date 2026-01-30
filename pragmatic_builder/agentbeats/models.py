@@ -8,3 +8,4 @@ class EvalRequest(BaseModel):
 class EvalResult(BaseModel):
     accuracy: float
     avg_questions_per_instruction: float
+    overall_avg_score: float

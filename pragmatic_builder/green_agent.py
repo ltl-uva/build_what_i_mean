@@ -171,7 +171,8 @@ class BuildingInstructorGreenAgent:
         try:
             result = EvalResult(
                 accuracy=overall_accuracy,
-                avg_questions_per_instruction=overall_avg_questions
+                avg_questions_per_instruction=overall_avg_questions,
+                overall_avg_score=overall_avg_score
             )
             await updater.add_artifact(
                 parts=[
@@ -179,21 +180,21 @@ class BuildingInstructorGreenAgent:
                 ],
                 name="Result",
             )
-
             # Also add detailed results for each seed
-            import json
-            detailed_results = {
-                "overall_accuracy": overall_accuracy,
-                "overall_avg_questions": overall_avg_questions,
-                "overall_avg_score": overall_avg_score,  # Add average score
-                "individual_seeds": all_results
-            }
-            await updater.add_artifact(
-                parts=[
-                    Part(root=TextPart(text=json.dumps(detailed_results, indent=2))),
-                ],
-                name="Detailed_Results",
-            )
+            # TODO: decide how to present these results.
+            # import json
+            # detailed_results = {
+            #     "overall_accuracy": overall_accuracy,
+            #     "overall_avg_questions": overall_avg_questions,
+            #     "overall_avg_score": overall_avg_score,  # Add average score
+            #     "individual_seeds": all_results
+            # }
+            # await updater.add_artifact(
+            #     parts=[
+            #         Part(root=TextPart(text=json.dumps(detailed_results, indent=2))),
+            #     ],
+            #     name="Detailed_Results",
+            # )
         finally:
             self._tool_provider.reset()
         return result
