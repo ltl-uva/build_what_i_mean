@@ -244,7 +244,14 @@ class BuildingInstructorGreenAgent:
 
 
             case _:
-                raise ServerError(error=InvalidParamsError(message="Invalid action in response"))
+                # Treat invalid actions as incorrect builds
+                points = -10
+                return {"message": f"Invalid response format. {points} points. Expected [BUILD] or [ASK], but got: {action}. Target was: {target_structure}",
+                        "num_correct": 0,
+                        "num_questions": 0,
+                        "built": True,
+                        "points": points
+                        }
 
 
     @staticmethod
