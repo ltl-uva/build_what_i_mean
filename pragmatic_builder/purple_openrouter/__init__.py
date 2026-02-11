@@ -1,0 +1,1 @@
+"""OpenRouter-based purple agent."""

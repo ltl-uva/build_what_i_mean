@@ -184,11 +184,11 @@ class BuildingGameTask:
                         fully_spec_idx += 1
 
                 elif order_item == "critical":
-                    # For Pia, always use 'a' version
+                    # For Pia, always use 'b' version (symmetric/consistent with context)
                     if critical_idx < len(critical_pool):
                         trial_base = critical_pool[critical_idx]
                         instr = create_instruction_with_version(trial_base, speaker,
-                                                                critical_list_id, 'a')
+                                                                critical_list_id, 'b')
                         if instr:
                             instructions.append(instr)
                         critical_idx += 1

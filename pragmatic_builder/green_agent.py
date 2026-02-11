@@ -64,7 +64,7 @@ class BuildingInstructorGreenAgent:
         list2_path = self._resolve_path(req.config["list2_path"])
 
         # Run 8 trials with different seeds
-        num_seeds = 2
+        num_seeds = 4
         all_accuracies = []
         all_avg_questions = []
         all_results = {}
@@ -271,6 +271,7 @@ class BuildingInstructorGreenAgent:
 
                 # NEW: Save checkpoint after each seed
                 self._save_checkpoint(checkpoint_file, all_results, run_id)
+                logger.info(f"✓ Checkpoint saved with {len(all_results)} seed(s): {list(all_results.keys())}")
                 
             except Exception as e:
                 logger.error(f"Error in seed {seed}: {e}")
@@ -278,20 +279,32 @@ class BuildingInstructorGreenAgent:
                 self._save_checkpoint(checkpoint_file, all_results, run_id)
                 raise
 
-        # Calculate overall averages
+        # Calculate overall averages from all_results (not just new seeds)
+        # FIX: Rebuild all_accuracies and all_avg_questions from all_results to include checkpoint data
+        all_accuracies = [all_results[f"seed_{i}"]["accuracy"] 
+                         for i in range(num_seeds) 
+                         if f"seed_{i}" in all_results]
+        all_avg_questions = [all_results[f"seed_{i}"]["avg_questions_per_instruction"] 
+                            for i in range(num_seeds) 
+                            if f"seed_{i}" in all_results]
+        
         overall_accuracy = sum(all_accuracies) / len(all_accuracies) if all_accuracies else 0.0
         overall_avg_questions = sum(all_avg_questions) / len(all_avg_questions) if all_avg_questions else 0.0
 
-        # Calculate average score across all seeds
-        all_scores = [all_results[f"seed_{seed}"]["total_score"] for seed in range(start_seed, num_seeds)]
+        # Calculate average score across all seeds in all_results
+        # FIX: Use range(num_seeds) instead of range(start_seed, num_seeds)
+        all_scores = [all_results[f"seed_{i}"]["total_score"] 
+                     for i in range(num_seeds) 
+                     if f"seed_{i}" in all_results]
         overall_avg_score = sum(all_scores) / len(all_scores) if all_scores else 0.0
         
         # Aggregate statistics by speaker and trial type across all seeds
         aggregate_speaker_stats = {"Lisa": {"questions": 0, "trials": 0}, "Pia": {"questions": 0, "trials": 0}}
         aggregate_trial_type_stats = {"fully_spec": {"questions": 0, "trials": 0}, "underspec": {"questions": 0, "trials": 0}}
         
-        for seed in range(start_seed, num_seeds):
-            seed_key = f"seed_{seed}"
+        # FIX: Use range(num_seeds) instead of range(start_seed, num_seeds)
+        for i in range(num_seeds):
+            seed_key = f"seed_{i}"
             if seed_key in all_results:
                 for speaker in ["Lisa", "Pia"]:
                     aggregate_speaker_stats[speaker]["questions"] += all_results[seed_key]["stats_by_speaker"][speaker]["questions"]
@@ -333,6 +346,22 @@ class BuildingInstructorGreenAgent:
             )
             
             # NEW: Save final results with metadata
+            if len(all_results) < num_seeds:
+                logger.warning(f"⚠️  Only {len(all_results)} of {num_seeds} seeds completed!")
+            logger.info(f"Preparing final results with {len(all_results)} seeds: {list(all_results.keys())}")
+            
+            # DEBUG: Log detailed information about all_results before creating final_results
+            logger.info("=" * 60)
+            logger.info("DEBUG: Contents of all_results before creating final_results:")
+            for seed_key in sorted(all_results.keys()):
+                seed_data = all_results[seed_key]
+                logger.info(f"  {seed_key}:")
+                logger.info(f"    - accuracy: {seed_data.get('accuracy', 'MISSING')}")
+                logger.info(f"    - avg_questions: {seed_data.get('avg_questions_per_instruction', 'MISSING')}")
+                logger.info(f"    - total_score: {seed_data.get('total_score', 'MISSING')}")
+                logger.info(f"    - num results: {len(seed_data.get('results', {}))}")
+            logger.info("=" * 60)
+            
             final_results = {
                 "model_version": self._model_version,
                 "run_id": run_id,
@@ -346,8 +375,17 @@ class BuildingInstructorGreenAgent:
             }
             
             final_file = self._checkpoint_dir / f"{model_name_clean}_final_{run_id}.json"
+            
+            # DEBUG: Verify what's actually in final_results before writing
+            logger.info("=" * 60)
+            logger.info("DEBUG: Contents of final_results['individual_seeds'] before writing:")
+            logger.info(f"  Number of seeds: {len(final_results.get('individual_seeds', {}))}")
+            logger.info(f"  Seed keys: {list(final_results.get('individual_seeds', {}).keys())}")
+            logger.info("=" * 60)
+            
             final_file.write_text(json.dumps(final_results, indent=2))
-            logger.info(f"Saved final results to {final_file}")
+            logger.info(f"✓ Saved final results to {final_file}")
+            logger.info(f"  Final file contains {len(all_results)} seeds: {list(all_results.keys())}")
             
             # Also add detailed results as artifact (optional)
             # await updater.add_artifact(
@@ -380,29 +418,39 @@ class BuildingInstructorGreenAgent:
         return True, "ok"
 
     async def eval_message(self, response: str, target_structure: str):
-        # Strip whitespace and check if response starts with valid action
+        # Strip whitespace
         response = response.strip()
         
-        # Check if response starts with [BUILD] or [ASK]
-        if not (response.startswith("[BUILD]") or response.startswith("[ASK]")):
-            # Invalid response - treat as incorrect structure and move on
+        # Extract action type and content
+        if response.startswith("[BUILD]"):
+            action = "[BUILD]"
+            content_str = response[7:]  # Everything after "[BUILD]"
+        elif response.startswith("[ASK]"):
+            action = "[ASK]"
+            content_str = response[5:]  # Everything after "[ASK]"
+        else:
+            # Invalid response format
             points = -10
             logger.warning(f"Invalid response format (not [BUILD] or [ASK]): {response[:100]}")
             return {
-                "message": f"Incorrect structure. {points} points. Expected [BUILD] or [ASK], but got: {response[:50]}... Moving to next instruction.",
+                "message": f"Invalid response format. {points} points. Expected [BUILD] or [ASK], but got: {response[:50]}... Moving to next instruction.",
                 "num_correct": 0,
                 "num_questions": 0,
                 "built": True,  # Move on to next instruction
                 "points": points
             }
         
-        string_response = response.split(";")
-        action = string_response[0]
-        
         match action:
             case "[BUILD]":
-                content = self._normalize_structure(string_response[1:])
+                # Remove leading semicolon if present
+                if content_str.startswith(";"):
+                    content_str = content_str[1:]
+                
+                # Parse coordinates
+                coords = [c.strip() for c in content_str.split(";") if c.strip()]
+                content = self._normalize_structure(coords)
                 target_structure_set = self._normalize_structure(target_structure.split(";"))
+                
                 if content == target_structure_set:
                     points = 10
                     return {"message": f"Correct structure built! +{points} points. {target_structure}",
@@ -421,14 +469,16 @@ class BuildingInstructorGreenAgent:
                             }
 
             case "[ASK]":
-                content = ";".join(string_response[1:]).strip()
+                # Take everything after [ASK] as the question (with or without semicolon)
+                question = content_str.lstrip(";").strip()
+                
                 if self._qa:
                     answer = await self._qa.answer(
-                        question=content,
+                        question=question,
                         target_structure=target_structure,
                     )
                 else:
-                    answer = self._fallback_answer(content, target_structure)
+                    answer = self._fallback_answer(question, target_structure)
                 points = -5
                 return {"message": f"Answer: {answer} ({points} points for asking)",
                         "num_correct": None,
@@ -437,7 +487,7 @@ class BuildingInstructorGreenAgent:
                         "points": points}
 
             case _:
-                # Fallback case (should not reach here due to check above, but keeping for safety)
+                # Fallback case (should not reach here, but keeping for safety)
                 points = -10
                 return {"message": f"Invalid response format. {points} points. Expected [BUILD] or [ASK]. Moving to next instruction.",
                         "num_correct": 0,

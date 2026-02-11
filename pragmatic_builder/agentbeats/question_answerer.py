@@ -46,7 +46,7 @@ class QuestionAnswerer:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not api_key:
             return None
-        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+        model = "gpt-4o-mini"  # FIXED: Always use gpt-4o-mini for Q&A
         base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
         timeout = float(os.getenv("OPENAI_TIMEOUT", "30"))
         temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.2"))
@@ -72,15 +72,23 @@ class QuestionAnswerer:
         )
 
         try:
-            response = await self._client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # Prepare API call parameters
+            api_params = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
+                "temperature": self.temperature,
+            }
+            
+            # GPT-4o and newer models use max_completion_tokens instead of max_tokens
+            if "gpt-4o" in self.model or "gpt-4-turbo" in self.model:
+                api_params["max_completion_tokens"] = self.max_tokens
+            else:
+                api_params["max_tokens"] = self.max_tokens
+            
+            response = await self._client.chat.completions.create(**api_params)
         except Exception as exc:
             logger.warning("OpenAI QA failed: %s", exc)
             return "Unable to answer the question right now."
