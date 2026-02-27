@@ -4,9 +4,14 @@ import csv
 import random
 from typing import Any, Dict, List
 
+NAMES = [
+    'Anna', 'Emma', 'Lena', 'Sarah', 'Julia',
+    'Marie', 'Laura', 'Nina', 'Sophie', 'Clara'
+]
+
 
 class BuildingGameTask:
-    """Task for generating building game instructions with two speakers (Pia and Lisa)."""
+    """Task for generating building game instructions with two speakers."""
 
     def __init__(self, list1_path: str, list2_path: str, seed: int | None = None) -> None:
         self.list1_path = list1_path
@@ -91,10 +96,12 @@ class BuildingGameTask:
         if not isinstance(payload, dict):
             raise ValueError("Building game input must be a dictionary or None")
 
-        # Step 1: Randomly choose speaker order
-        speakers = ['Pia', 'Lisa']
-        first_speaker = self.rng.choice(speakers)
-        second_speaker = 'Lisa' if first_speaker == 'Pia' else 'Pia'
+        # Step 1: Pick two speaker names and randomly assign to first/second position
+        names = self.rng.sample(NAMES, 2)
+        role_a_speaker = names[0]  # uses PiaOrdering (critical = 'b' version)
+        role_b_speaker = names[1]  # uses LisaOrdering (critical_a / critical_b)
+        first_speaker = self.rng.choice([role_a_speaker, role_b_speaker])
+        second_speaker = role_b_speaker if first_speaker == role_a_speaker else role_a_speaker
 
         # Step 2: Randomly choose list for fully_spec trials
         fully_spec_list = self.rng.choice([1, 2])
@@ -168,7 +175,7 @@ class BuildingGameTask:
                                               fully_spec_list_id: int,
                                               critical_list_id: int) -> List[Dict[str, Any]]:
             instructions = []
-            ordering = self.LisaOrdering if speaker == 'Lisa' else self.PiaOrdering
+            ordering = self.LisaOrdering if speaker == role_b_speaker else self.PiaOrdering
 
             fully_spec_idx = 0
             critical_idx = 0
@@ -216,22 +223,22 @@ class BuildingGameTask:
             return instructions
 
         # Generate instructions for both speakers
-        if first_speaker == 'Pia':
+        if first_speaker == role_a_speaker:
             instructions_A = generate_instructions_for_speaker(
-                'Pia', first_fully_spec_pool, first_critical_pool,
+                role_a_speaker, first_fully_spec_pool, first_critical_pool,
                 fully_spec_list, underspec_list
             )
             instructions_B = generate_instructions_for_speaker(
-                'Lisa', second_fully_spec_pool, second_critical_pool,
+                role_b_speaker, second_fully_spec_pool, second_critical_pool,
                 other_fully_spec_list, other_underspec_list
             )
-        else:  # first_speaker == 'Lisa'
+        else:
             instructions_A = generate_instructions_for_speaker(
-                'Lisa', first_fully_spec_pool, first_critical_pool,
+                role_b_speaker, first_fully_spec_pool, first_critical_pool,
                 fully_spec_list, underspec_list
             )
             instructions_B = generate_instructions_for_speaker(
-                'Pia', second_fully_spec_pool, second_critical_pool,
+                role_a_speaker, second_fully_spec_pool, second_critical_pool,
                 other_fully_spec_list, other_underspec_list
             )
 
