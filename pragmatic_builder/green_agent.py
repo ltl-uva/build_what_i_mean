@@ -203,12 +203,39 @@ class BuildingInstructorGreenAgent:
         return True, "ok"
 
     async def eval_message(self, response: str, target_structure: str):
-        string_response = response.split(";")
-        action = string_response[0]
+        # Strip whitespace
+        response = response.strip()
+
+        # Extract action type and content
+        if response.startswith("[BUILD]"):
+            action = "[BUILD]"
+            content_str = response[7:]  # Everything after "[BUILD]"
+        elif response.startswith("[ASK]"):
+            action = "[ASK]"
+            content_str = response[5:]  # Everything after "[ASK]"
+        else:
+            # Invalid response format - give Rita a chance to retry
+            points = 0
+            logger.warning(f"Invalid response format (not [BUILD] or [ASK]): {response[:100]}")
+            return {
+                "message": f"Invalid response format. Expected [BUILD] or [ASK], but got: {response[:50]}...",
+                "num_correct": 0,
+                "num_questions": 0,
+                "built": False,  # Allow retry
+                "points": points
+            }
+
         match action:
             case "[BUILD]":
-                content = self._normalize_structure(string_response[1:])
+                # Remove leading semicolon if present
+                if content_str.startswith(";"):
+                    content_str = content_str[1:]
+
+                # Parse coordinates
+                coords = [c.strip() for c in content_str.split(";") if c.strip()]
+                content = self._normalize_structure(coords)
                 target_structure_set = self._normalize_structure(target_structure.split(";"))
+
                 if content == target_structure_set:
                     points = 10
                     return {"message": f"Correct structure built! +{points} points. {target_structure}",
@@ -227,14 +254,16 @@ class BuildingInstructorGreenAgent:
                             }
 
             case "[ASK]":
-                content = ";".join(string_response[1:]).strip()
+                # Take everything after [ASK] as the question (with or without semicolon)
+                question = content_str.lstrip(";").strip()
+
                 if self._qa:
                     answer = await self._qa.answer(
-                        question=content,
+                        question=question,
                         target_structure=target_structure,
                     )
                 else:
-                    answer = self._fallback_answer(content, target_structure)
+                    answer = self._fallback_answer(question, target_structure)
                 points = -5
                 return {"message": f"Answer: {answer} ({points} points for asking)",
                         "num_correct": None,
@@ -242,9 +271,15 @@ class BuildingInstructorGreenAgent:
                         "built": False,
                         "points": points}
 
-
             case _:
-                raise ServerError(error=InvalidParamsError(message="Invalid action in response"))
+                # Fallback case (should not reach here, but keeping for safety)
+                points = -10
+                return {"message": f"Invalid response format. {points} points. Expected [BUILD] or [ASK]. Moving to next instruction.",
+                        "num_correct": 0,
+                        "num_questions": 0,
+                        "built": True,
+                        "points": points
+                        }
 
 
     @staticmethod
