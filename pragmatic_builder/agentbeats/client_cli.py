@@ -3,7 +3,10 @@ import json
 import asyncio
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 from agentbeats.client import send_message
 from agentbeats.models import EvalRequest

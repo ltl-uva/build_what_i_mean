@@ -2,7 +2,10 @@ import argparse
 import asyncio
 import os, sys, time, subprocess, shlex, signal
 from pathlib import Path
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 import httpx
 from dotenv import load_dotenv
 
