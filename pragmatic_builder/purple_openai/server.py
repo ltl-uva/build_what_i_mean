@@ -56,21 +56,55 @@ class OpenAIPurpleAgent(AgentExecutor):
             return
 
         system_prompt = (
-            "You are a purple agent that builds blocks on a grid. "
-            "Respond with one line only. Use either "
-            "[BUILD];Color,x,y,z;Color,x,y,z;... or "
-            "[ASK];<question> if you need clarification."
+            "You are a block-building agent on a 9x9 grid.\n\n"
+            
+            "GRID COORDINATES:\n"
+            "- The grid is the x-z plane. Origin (0,0) is the center.\n"
+            "- Valid x,z coordinates: [-400,-300,-200,-100,0,100,200,300,400]\n"
+            "- Y-axis is vertical (height). Ground level y=50. Each block adds +100.\n"
+            "- Valid y coordinates: [50,150,250,350,450]\n"
+            "- Format: Color,x,y,z (e.g., Red,0,50,0 means a red block at center, ground level)\n\n"
+            
+            "YOUR RESPONSES:\n"
+            "You must respond with ONLY one of these two formats:\n\n"
+            
+            "1. [BUILD];Color,x,y,z;Color,x,y,z;...\n"
+            "   - Use this to build or modify the structure\n"
+            "   - List ALL blocks that should be on the grid (including existing ones from START_STRUCTURE)\n"
+            "   - No spaces, semicolons separate blocks\n"
+            "   - Colors must be capitalized (Red, Blue, Green, Yellow, Purple, etc.)\n"
+            "   Example: [BUILD];Purple,0,50,0;Green,0,150,0;Green,0,250,0\n\n"
+            
+            "2. [ASK];<your question>\n"
+            "   - Use this if you need clarification about the instruction\n"
+            "   - Costs -5 points, so only ask if truly necessary\n"
+            "   Example: [ASK];How many green blocks should I add?\n\n"
+            
+            "IMPORTANT:\n"
+            "- Never respond with 'Acknowledged' or any other text\n"
+            "- Always respond with either [BUILD] or [ASK]\n"
+            "- When building, include the START_STRUCTURE blocks plus any new blocks from the instruction\n"
+            "- Correct structure: +10 points. Incorrect: -10 points. Question: -5 points.\n"
+            "- Learn from feedback in previous messages to improve your performance."
         )
         try:
-            completion = await self._client.chat.completions.create(
-                model=self._model,
-                messages=[
+            # Prepare API call parameters
+            api_params = {
+                "model": self._model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_input},
                 ],
-                temperature=0.2,
-                max_tokens=512,
-            )
+                "temperature": 0.2,
+            }
+            
+            # GPT-4o and newer models use max_completion_tokens instead of max_tokens
+            if "gpt-4o" in self._model or "gpt-4-turbo" or "gpt-5.1" in self._model:
+                api_params["max_completion_tokens"] = 512
+            else:
+                api_params["max_tokens"] = 512
+            
+            completion = await self._client.chat.completions.create(**api_params)
             content = (completion.choices[0].message.content or "").strip()
         except Exception as exc:
             logger.warning("OpenAI request failed: %s", exc)
