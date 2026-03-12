@@ -115,7 +115,7 @@ def instruction_following_evaluator_card(agent_name: str, card_url: str) -> Agen
         version='1.0.0',
         default_input_modes=['text'],
         default_output_modes=['text'],
-        capabilities=AgentCapabilities(),
+        capabilities=AgentCapabilities(streaming=True),
         skills=[skill],
     )
     return agent_card
