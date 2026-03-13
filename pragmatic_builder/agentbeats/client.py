@@ -40,20 +40,19 @@ def merge_parts(parts: list[Part]) -> str:
             chunks.append(json.dumps(part.root.data, indent=2))
     return "\n".join(chunks)
 
-async def send_message(message: str, base_url: str, context_id: str | None = None, streaming=False, consumer: Consumer | None = None):
+async def send_message(message: str, base_url: str, context_id: str | None = None, streaming=False, consumer: Consumer | None = None, a2a_client=None):
     """Returns dict with context_id, response and status (if exists)"""
-    async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as httpx_client:
+    own_client = a2a_client is None
+    if own_client:
+        httpx_client = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
         resolver = A2ACardResolver(httpx_client=httpx_client, base_url=base_url)
         agent_card = await resolver.get_agent_card()
-        config = ClientConfig(
-            httpx_client=httpx_client,
-            streaming=streaming,
-        )
-        factory = ClientFactory(config)
-        client = factory.create(agent_card)
+        config = ClientConfig(httpx_client=httpx_client, streaming=streaming)
+        a2a_client = ClientFactory(config).create(agent_card)
 
+    try:
         if consumer:
-            await client.add_event_consumer(consumer)
+            await a2a_client.add_event_consumer(consumer)
 
         outbound_msg = create_message(text=message, context_id=context_id)
 
@@ -64,7 +63,7 @@ async def send_message(message: str, base_url: str, context_id: str | None = Non
         }
 
         # if streaming == False, only one event is generated
-        async for event in client.send_message(outbound_msg):
+        async for event in a2a_client.send_message(outbound_msg):
             last_event = event
 
         match last_event:
@@ -86,3 +85,6 @@ async def send_message(message: str, base_url: str, context_id: str | None = Non
                 pass
 
         return outputs
+    finally:
+        if own_client:
+            await httpx_client.aclose()

@@ -196,7 +196,7 @@ class BuildingInstructorGreenAgent:
             #     name="Detailed_Results",
             # )
         finally:
-            self._tool_provider.reset()
+            await self._tool_provider.reset()
         return result
 
     def validate_request(self, request: EvalRequest) -> tuple[bool, str]:
