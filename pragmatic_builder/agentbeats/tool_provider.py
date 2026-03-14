@@ -14,7 +14,7 @@ class ToolProvider:
             httpx_client = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
             resolver = A2ACardResolver(httpx_client=httpx_client, base_url=url)
             agent_card = await resolver.get_agent_card()
-            config = ClientConfig(httpx_client=httpx_client)
+            config = ClientConfig(httpx_client=httpx_client, streaming=True)
             self._a2a_clients[url] = ClientFactory(config).create(agent_card)
             self._httpx_clients[url] = httpx_client
         return self._a2a_clients[url]
@@ -36,6 +36,7 @@ class ToolProvider:
             message=message,
             base_url=url,
             context_id=None if new_conversation else self._context_ids.get(url, None),
+            streaming=True,
             a2a_client=a2a_client,
         )
         if outputs.get("status", "completed") != "completed":
