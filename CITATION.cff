@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Build What I Mean"
+abstract: "Benchmark evaluating dapatation to a partner in a block building game"
+version: "0.1.0"
+date-released: 2026-03-19
+url: "https://github.com/ltl-uva/build_what_i_mean"
+repository-code: "https://github.com/ltl-uva/build_what_i_mean"
+license: MIT
+authors:
+  - name: "LTL-UVA"
+    alias: "ltl-uva"
+    website: "https://github.com/ltl-uva"
